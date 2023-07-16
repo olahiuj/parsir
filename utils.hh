@@ -17,14 +17,6 @@ class Nullable {
     auto nullable(std::vector<Symbol> body) -> bool;
 
   private:
-    auto ruleWith(Symbol head) -> std::vector<Rule> {
-        auto view = grammar.getRules()
-                    | std::views::filter([head](Rule rule) {
-                          return rule.getHead() == head;
-                      });
-        return {view.begin(), view.end()};
-    }
-
     std::map<Symbol, bool> nullableMap;
     const Grammar         &grammar;
 };
@@ -38,6 +30,10 @@ class First {
 
     auto getFirst(Symbol symbol) -> std::set<Symbol>;
     auto getFirst(std::vector<Symbol> symbol) -> std::set<Symbol>;
+    auto getFirst(std::vector<Symbol> symbol, Symbol lookAhead) -> std::set<Symbol> {
+        symbol.push_back(lookAhead);
+        return getFirst(symbol);
+    }
 
   private:
     auto solve() -> void;

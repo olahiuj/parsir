@@ -1,6 +1,7 @@
 #pragma once
 
 #include <initializer_list>
+#include <numeric>
 #include <ostream>
 #include <ranges>
 #include <set>
@@ -8,6 +9,13 @@
 #include <vector>
 
 struct Symbol {
+    struct hash {
+        auto operator()(const Symbol &symbol) const -> size_t {
+            return std::hash<std::string>{}(symbol.getName())
+                   * std::hash<bool>{}(symbol.isTerminal());
+        }
+    };
+
     static auto mkTerm(std::string name) -> Symbol {
         return {name, true};
     }
@@ -29,6 +37,19 @@ struct Symbol {
 };
 
 struct Rule {
+    struct hash {
+        auto operator()(const Rule &rule) const -> size_t {
+            return std::transform_reduce(
+                rule.getBody().cbegin(),
+                rule.getBody().cend(),
+                Symbol::hash{}(rule.getHead()),
+                [](auto &&x, auto &&y) {
+                    return x * y;
+                },
+                Symbol::hash{});
+        }
+    };
+
     struct mk {
         mk(Symbol head) :
           head_(head) {
@@ -43,6 +64,7 @@ struct Rule {
     auto getHead() const -> Symbol { return head_; }
     auto getBody() const -> const std::vector<Symbol> & { return body_; }
     auto getBody() -> std::vector<Symbol> & { return body_; }
+    auto operator<=>(const Rule &) const = default;
 
   private:
     Rule(Symbol head, std::initializer_list<Symbol> body) :
@@ -59,9 +81,10 @@ struct Grammar {
         return {start, {rules...}};
     }
 
-    auto getStart() const -> Symbol { return start_; }
+    auto getStartSymbol() const -> Symbol { return start_; }
+    auto getStartRule() const -> Rule { return getRulesWith(getStartSymbol()).at(0); }
     auto getSymbols() const -> std::set<Symbol> {
-        std::set<Symbol> result{getStart()};
+        std::set<Symbol> result{getStartSymbol()};
         for (auto &&rule : getRules()) {
             result.emplace(rule.getHead());
             for (auto &&symbol : rule.getBody()) {
@@ -78,6 +101,13 @@ struct Grammar {
     }
     auto getRules() const -> const std::vector<Rule> & { return rules_; }
     auto getRules() -> std::vector<Rule> & { return rules_; }
+    auto getRulesWith(Symbol head) const -> std::vector<Rule> {
+        auto view = getRules()
+                    | std::views::filter([head](Rule rule) {
+                          return rule.getHead() == head;
+                      });
+        return {view.begin(), view.end()};
+    }
 
   private:
     Grammar(Symbol start, std::initializer_list<Rule> rules) :

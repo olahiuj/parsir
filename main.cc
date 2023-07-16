@@ -1,9 +1,10 @@
 #include "grammar.hh"
+#include "lr1.hh"
 #include "utils.hh"
 
 #include <iostream>
 
-auto main() -> int {
+[[maybe_unused]] static auto testFollow() -> void {
     Grammar grammar = Grammar::mk(
         "E"_sym,
         Rule::mk("E"_sym).of("T"_sym, "A"_sym),
@@ -21,5 +22,20 @@ auto main() -> int {
     std::cout << follow.getFollow("T"_sym);
     std::cout << follow.getFollow("B"_sym);
     std::cout << follow.getFollow("F"_sym);
+}
+
+[[maybe_unused]] static auto testLR1() -> void {
+    Grammar grammar = Grammar::mk(
+        "S'"_sym,
+        Rule::mk("S'"_sym).of("S"_sym),
+        Rule::mk("S"_sym).of("C"_sym, "C"_sym),
+        Rule::mk("C"_sym).of("c"_sym, "C"_sym),
+        Rule::mk("C"_sym).of("d"_sym));
+
+    LR1Builder builder{grammar};
+}
+
+auto main() -> int {
+    testLR1();
     return 0;
 }

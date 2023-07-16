@@ -47,7 +47,7 @@ auto Nullable::nullable(Symbol symbol) -> bool {
         return false;
     }
 
-    for (auto &&rule : ruleWith(symbol)) {
+    for (auto &&rule : grammar.getRulesWith(symbol)) {
         if (nullable(rule.getBody())) {
             nullableMap.emplace(symbol, true);
             return true;
@@ -72,8 +72,11 @@ auto First::getFirst(std::vector<Symbol> body) -> std::set<Symbol> {
 }
 
 auto First::getFirst(Symbol symbol) -> std::set<Symbol> {
-    if (firstMap.count(symbol)) {
+    if (firstMap.contains(symbol)) {
         return firstMap.at(symbol);
+    }
+    if (symbol.isTerminal()) {
+        return {symbol};
     }
     solve();
     return firstMap.at(symbol);
@@ -117,7 +120,7 @@ auto Follow::solve() -> void {
     for (auto &&symbol : grammar.getSymbols()) {
         followMap.emplace(symbol, std::set<Symbol>{});
     }
-    followMap.at(grammar.getStart()).insert("$"_sym);
+    followMap.at(grammar.getStartSymbol()).insert("$"_sym);
 
     bool changed;
     do {
