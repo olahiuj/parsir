@@ -1,18 +1,29 @@
 #pragma once
 
+#include "cst.hh"
 #include "grammar.hh"
 #include "table.hh"
 #include "utils.hh"
 
+#include <bits/ranges_base.h>
 #include <cassert>
+#include <concepts>
 #include <functional>
 #include <map>
+#include <memory>
 #include <numeric>
+#include <ostream>
 #include <queue>
-#include <set>
+#include <stack>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
+
+template <typename T>
+concept input_stream = requires(T &t) {
+    { *std::ranges::begin(t) } -> std::same_as<Symbol>;
+    requires std::ranges::range<T>;
+};
 
 class Item {
   public:
@@ -56,7 +67,7 @@ class Item {
     size_t dot_;
 };
 
-class LR1Builder {
+class LR1Parser {
   public:
     using ItemSetHandle = size_t;
     using ItemSet       = std::unordered_set<Item, Item::hash>;
@@ -75,7 +86,7 @@ class LR1Builder {
         }
     };
 
-    LR1Builder(const Grammar &grammar) :
+    LR1Parser(const Grammar &grammar) :
       grammar_(grammar),
       fSolver_(grammar),
       nItemSet_(0) {
@@ -120,7 +131,51 @@ class LR1Builder {
 
     static auto resolver(TableT::Action x, TableT::Action y, Symbol symbol) -> TableT::Action;
 
-    auto genTable() const -> TableT;
+    auto genTable() -> void;
+    auto getTable() const -> const TableT & { return *table_; }
+
+    template <typename RangeT>
+    auto parse(const RangeT &input) const -> cst::Node {
+        using namespace cst;
+
+        auto stateStack = std::stack<ItemSetHandle>{{getStartHandle()}};
+        auto nodeStack  = std::stack<Node>{};
+        for (auto it = input.begin(); it != input.end();) {
+            auto symbol = *it;
+            auto action = table_->getAction(stateStack.top(), symbol).value();
+            switch (action.kind) {
+                case TableT::SHIFT: {
+                    stateStack.push(action.state);
+                    nodeStack.push(Node{symbol.getName()});
+                    it++;
+                    break;
+                }
+                case TableT::REDUCE: {
+                    auto body = std::deque<Node>{};
+                    auto rule = action.rule.value();
+                    for (size_t i = 0; i < rule.getBody().size(); i++) {
+                        body.push_front(nodeStack.top());
+                        nodeStack.pop();
+                        stateStack.pop();
+                    }
+                    stateStack.push(table_->getTransition(stateStack.top(), rule.getHead()).value());
+
+                    auto node = Node{rule.getHead().getName()};
+                    for (auto child : body) {
+                        node.getChildren()
+                            .push_back(child);
+                    }
+                    nodeStack.push(node);
+                    break;
+                }
+                case TableT::ACCEPT: {
+                    return nodeStack.top();
+                    break;
+                }
+            }
+        }
+        std::abort();
+    }
 
   private:
     auto computeNext(const ItemSet &items, Symbol symbol) -> ItemSet;
@@ -129,6 +184,8 @@ class LR1Builder {
     const Grammar &grammar_;
     First          fSolver_;
     size_t         nItemSet_ = 0;
+    std::unique_ptr<TableT>
+        table_;
 
     std::unordered_map<ItemSetHandle, ItemSet> handleMap_;
     std::map<std::pair<ItemSetHandle, Symbol>, ItemSetHandle>

@@ -32,30 +32,34 @@
         Rule::mk("C"_sym).of("c"_sym, "C"_sym),
         Rule::mk("C"_sym).of("d"_sym));
 
-    auto builder = LR1Builder{grammar};
-    auto table   = builder.genTable();
+    auto builder = LR1Parser{grammar};
+    builder.genTable();
+    auto &table = builder.getTable();
+    std::cout << table;
+}
 
-    std::cout << "\t: ";
-    for (auto &&symbol : grammar.getTerms()) {
-        std::cout << symbol
-                  << "\t\t";
-    }
-    std::cout << std::endl;
-    for (size_t state = 0; state < table.getStateCount(); state++) {
-        std::cout << state
-                  << "\t: ";
-        for (auto &&symbol : grammar.getTerms()) {
-            std::cout
-                << table.getAction(state, symbol)
-                       .transform([](auto &&x) { return x.to_string(); })
-                       .value_or("")
-                << "\t\t";
-        }
-        std::cout << std::endl;
-    }
+[[maybe_unused]] static auto testExpr() -> void {
+    auto grammar = Grammar::mk(
+        "S'"_sym,
+        Rule::mk("S'"_sym).of("E"_sym),
+        Rule::mk("E"_sym).of("E"_sym, "+"_sym, "T"_sym),
+        Rule::mk("E"_sym).of("T"_sym),
+        Rule::mk("T"_sym).of("T"_sym, "*"_sym, "F"_sym),
+        Rule::mk("T"_sym).of("F"_sym),
+        Rule::mk("F"_sym).of("("_sym, "E"_sym, ")"_sym),
+        Rule::mk("F"_sym).of("x"_sym));
+
+    auto parser = LR1Parser{grammar};
+    parser.genTable();
+    auto &table = parser.getTable();
+
+    std::cout << table;
+
+    auto node = parser.parse(std::vector<Symbol>{"x"_sym, "*"_sym, "x"_sym, "+"_sym, "x"_sym, "$"_sym});
+    std::cout << node;
 }
 
 auto main() -> int {
-    testLR1();
+    testExpr();
     return 0;
 }

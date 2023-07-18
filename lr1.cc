@@ -1,7 +1,10 @@
 #include "lr1.hh"
+#include "cst.hh"
 #include "table.hh"
+#include <memory>
+#include <stack>
 
-auto LR1Builder::computeNext(const ItemSet &items, Symbol symbol) -> ItemSet {
+auto LR1Parser::computeNext(const ItemSet &items, Symbol symbol) -> ItemSet {
     ItemSet result{};
     for (auto &&item : items) {
         if (item.getCurrentSymbol() == symbol) {
@@ -11,7 +14,7 @@ auto LR1Builder::computeNext(const ItemSet &items, Symbol symbol) -> ItemSet {
     return closure(result);
 }
 
-auto LR1Builder::closure(const ItemSet &items) -> ItemSet {
+auto LR1Parser::closure(const ItemSet &items) -> ItemSet {
     ItemSet result{items};
 
     bool changed;
@@ -30,7 +33,7 @@ auto LR1Builder::closure(const ItemSet &items) -> ItemSet {
     return result;
 }
 
-auto LR1Builder::resolver(TableT::Action x, TableT::Action y, Symbol symbol) -> TableT::Action {
+auto LR1Parser::resolver(TableT::Action x, TableT::Action y, Symbol symbol) -> TableT::Action {
     // assume no conflict
     if (x == y) {
         return x;
@@ -38,33 +41,32 @@ auto LR1Builder::resolver(TableT::Action x, TableT::Action y, Symbol symbol) -> 
     std::abort();
 }
 
-auto LR1Builder::genTable() const -> TableT {
-    auto table = TableT{nItemSet_, resolver};
+auto LR1Parser::genTable() -> void {
+    table_ = std::make_unique<TableT>(nItemSet_, grammar_, resolver);
     for (auto &&[handle, itemSet] : handleMap_) {
         for (auto &&item : itemSet) {
             if (item.isDone()) {
                 auto lookAhead = item.getLookAhead();
                 if (item.getRule() == grammar_.getStartRule()) {
                     // [S'->S*, $]
-                    table.setAction(handle, lookAhead, TableT::Action::mkAccept());
+                    table_->setAction(handle, lookAhead, TableT::Action::mkAccept());
                 } else {
                     // [A->α*, a]
-                    table.setAction(handle, lookAhead, TableT::Action::mkReduce(item.getRule()));
+                    table_->setAction(handle, lookAhead, TableT::Action::mkReduce(item.getRule()));
                 }
             } else {
                 auto currentSymbol = item.getCurrentSymbol();
                 if (currentSymbol.isTerminal()) {
                     auto nextState = getNext(handle, currentSymbol).value();
-                    table.setAction(handle, currentSymbol, TableT::Action::mkShift(nextState));
+                    table_->setAction(handle, currentSymbol, TableT::Action::mkShift(nextState));
                 }
             }
         }
         for (auto &&symbol : grammar_.getNTerms()) {
             auto nextState = getNext(handle, symbol);
             if (nextState.has_value()) {
-                table.setTransition(handle, symbol, nextState.value());
+                table_->setTransition(handle, symbol, nextState.value());
             }
         }
     }
-    return table;
 }

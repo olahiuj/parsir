@@ -26,7 +26,7 @@ class Table {
         auto to_string() const -> std::string {
             switch (kind) {
                 case SHIFT: return "s" + std::to_string(state);
-                case REDUCE: return "r" + rule.value().to_string();
+                case REDUCE: return rule.value().to_string();
                 case ACCEPT: return "a";
                 default: std::abort();
             }
@@ -38,8 +38,11 @@ class Table {
     };
 
     template <typename FuncT>
-    Table(size_t nState, FuncT resolver) :
+    Table(size_t         nState,
+          const Grammar &grammar,
+          FuncT          resolver) :
       nState_(nState),
+      grammar_(grammar),
       resolver_(resolver),
       transitionTable_(nState),
       actionTable_(nState) {
@@ -70,12 +73,12 @@ class Table {
     auto setTransition(StateT from, Symbol symbol, StateT to) -> void {
         transitionTable_[from][symbol] = to;
     }
-    auto getStateCount() const -> size_t {
-        return nState_;
-    }
+    auto getStateCount() const -> size_t { return nState_; }
+    auto getGrammar() const -> const Grammar & { return grammar_; }
 
   private:
-    size_t nState_;
+    size_t         nState_;
+    const Grammar &grammar_;
     std::function<Action(Action, Action, Symbol)>
         resolver_;
     std::vector<std::map<Symbol, StateT>>
@@ -83,3 +86,25 @@ class Table {
     std::vector<std::map<Symbol, Action>>
         actionTable_;
 };
+
+template <typename T>
+static auto operator<<(std::ostream &os, const Table<T> &table) -> std::ostream & {
+    os << "\t: ";
+    for (auto &&symbol : table.getGrammar().getTerms()) {
+        os << symbol
+           << "\t\t\t";
+    }
+    os << std::endl;
+    for (size_t state = 0; state < table.getStateCount(); state++) {
+        os << state
+           << "\t: ";
+        for (auto &&symbol : table.getGrammar().getTerms()) {
+            os << table.getAction(state, symbol)
+                      .transform([](auto &&x) { return x.to_string(); })
+                      .value_or("")
+               << "\t\t\t";
+        }
+        os << std::endl;
+    }
+    return os;
+}
