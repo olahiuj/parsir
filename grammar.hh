@@ -65,6 +65,20 @@ struct Rule {
     auto getBody() const -> const std::vector<Symbol> & { return body_; }
     auto getBody() -> std::vector<Symbol> & { return body_; }
     auto operator<=>(const Rule &) const = default;
+    auto to_string() const -> std::string {
+        return getHead().getName()
+               + "->"
+               + std::transform_reduce(
+                   getBody().begin(),
+                   getBody().end(),
+                   std::string{""},
+                   [](auto &&x, auto &&y) {
+                       return x + y;
+                   },
+                   [](auto &&x) {
+                       return x.getName();
+                   });
+    }
 
   private:
     Rule(Symbol head, std::initializer_list<Symbol> body) :
@@ -75,6 +89,8 @@ struct Rule {
     std::vector<Symbol> body_;
 };
 
+static inline auto operator""_sym(const char *str, size_t len) -> Symbol;
+
 struct Grammar {
     template <typename... T>
     static auto mk(Symbol start, T... rules) -> Grammar {
@@ -84,7 +100,7 @@ struct Grammar {
     auto getStartSymbol() const -> Symbol { return start_; }
     auto getStartRule() const -> Rule { return getRulesWith(getStartSymbol()).at(0); }
     auto getSymbols() const -> std::set<Symbol> {
-        std::set<Symbol> result{getStartSymbol()};
+        auto result = std::set<Symbol>{getStartSymbol(), "$"_sym};
         for (auto &&rule : getRules()) {
             result.emplace(rule.getHead());
             for (auto &&symbol : rule.getBody()) {
@@ -96,6 +112,12 @@ struct Grammar {
     auto getNTerms() const -> std::set<Symbol> {
         auto range = getSymbols() | std::views::filter([](const Symbol &symbol) {
                          return !symbol.isEpsilon() && !symbol.isTerminal();
+                     });
+        return {range.begin(), range.end()};
+    }
+    auto getTerms() const -> std::set<Symbol> {
+        auto range = getSymbols() | std::views::filter([](const Symbol &symbol) {
+                         return symbol.isTerminal();
                      });
         return {range.begin(), range.end()};
     }
@@ -135,7 +157,7 @@ static inline auto operator<<(std::ostream &os, Symbol symbol) -> std::ostream &
 
 static inline auto operator<<(std::ostream &os, Rule rule) -> std::ostream & {
     os << rule.getHead()
-       << " -> ";
+       << "->";
     for (auto &&x : rule.getBody()) {
         os << x << " ";
     }

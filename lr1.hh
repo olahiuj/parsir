@@ -1,6 +1,7 @@
 #pragma once
 
 #include "grammar.hh"
+#include "table.hh"
 #include "utils.hh"
 
 #include <cassert>
@@ -59,6 +60,7 @@ class LR1Builder {
   public:
     using ItemSetHandle = size_t;
     using ItemSet       = std::unordered_set<Item, Item::hash>;
+    using TableT        = Table<ItemSetHandle>;
 
     struct hash {
         auto operator()(const ItemSet &items) const -> size_t {
@@ -109,7 +111,16 @@ class LR1Builder {
 
     auto getStartHandle() const -> ItemSetHandle { return 0; }
     auto getItemSet(ItemSetHandle handle) -> ItemSet { return handleMap_.at(handle); }
-    auto getNext(ItemSetHandle handle, Symbol symbol) const -> ItemSetHandle { return transitionMap_.at({handle, symbol}); }
+    auto getNext(ItemSetHandle handle, Symbol symbol) const noexcept -> std::optional<ItemSetHandle> {
+        if (transitionMap_.contains({handle, symbol})) {
+            return transitionMap_.at({handle, symbol});
+        }
+        return {};
+    }
+
+    static auto resolver(TableT::Action x, TableT::Action y, Symbol symbol) -> TableT::Action;
+
+    auto genTable() const -> TableT;
 
   private:
     auto computeNext(const ItemSet &items, Symbol symbol) -> ItemSet;

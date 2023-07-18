@@ -6,4 +6,5 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 add_executable(parsir
     main.cc
-    utils.cc)
+    utils.cc
+    lr1.cc)
